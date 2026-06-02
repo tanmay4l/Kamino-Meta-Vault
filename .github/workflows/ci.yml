@@ -29,7 +29,7 @@ jobs:
       - name: Install Anchor CLI
         shell: bash
         run: |
-          cargo install --git https://github.com/solana-foundation/anchor avm --locked --force
+          cargo install --git https://github.com/solana-foundation/anchor --tag v1.0.0 avm --locked --force
           avm install 1.0.0
           avm use 1.0.0
           echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
