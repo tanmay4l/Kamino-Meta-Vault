@@ -37,6 +37,12 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Create local validator wallet
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.config/solana"
+          solana-keygen new --no-bip39-passphrase --silent --force --outfile "$HOME/.config/solana/id.json"
+
       - name: Sync localnet program id
         run: anchor keys sync
 
