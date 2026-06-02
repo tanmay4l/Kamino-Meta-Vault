@@ -38,8 +38,16 @@ pub enum MetaVaultError {
     ProposalCountMismatch,
     #[msg("Duplicate proposal supplied")]
     DuplicateProposal,
+    #[msg("Campaign proposal limit reached")]
+    ProposalLimitReached,
+    #[msg("Proposal already has votes")]
+    ProposalHasVotes,
     #[msg("Kamino vault is already recorded")]
     KaminoVaultAlreadyRecorded,
+    #[msg("Kamino vault account is not owned by an allowed Kamino kvault program")]
+    InvalidKaminoVaultProgram,
+    #[msg("Kamino vault account is not an initialized Kamino VaultState")]
+    InvalidKaminoVaultAccount,
     #[msg("Unauthorized")]
     Unauthorized,
     #[msg("Arithmetic overflow")]

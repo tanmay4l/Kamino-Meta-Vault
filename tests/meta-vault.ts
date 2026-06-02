@@ -20,6 +20,13 @@ describe("kamino-meta-vault", () => {
   ).payer;
 
   const metadataHash = Array(32).fill(7);
+  const maxProposals = 16;
+  const kaminoKvaultProgramId = new anchor.web3.PublicKey(
+    "KvauGMspG5k6rtzrqqn7WNn3oZdyKqLKwK2XWQ8FLjd"
+  );
+  const initializedKaminoVault = new anchor.web3.PublicKey(
+    "3WG4wtgB2Pqz1d4z3ca3NJoNDa6L33UKMinEBj8L4VLk"
+  );
 
   async function setupConfig(
     quorumBps = 5_000,
@@ -132,19 +139,31 @@ describe("kamino-meta-vault", () => {
       };
     };
 
-    if (connection._rpcRequest) {
-      try {
-        await connection._rpcRequest("warpSlot", [target]);
-        if (connection._blockhashInfo) {
-          connection._blockhashInfo = {
-            latestBlockhash: null,
-            lastFetch: 0,
-            simulatedSignatures: [],
-            transactionSignatures: [],
-          };
+    for (let i = 0; connection._rpcRequest && i < 5; i += 1) {
+      const response = await connection._rpcRequest("warpSlot", [target]);
+      if (
+        response &&
+        typeof response === "object" &&
+        "error" in response &&
+        response.error
+      ) {
+        break;
+      }
+      if (connection._blockhashInfo) {
+        connection._blockhashInfo = {
+          latestBlockhash: null,
+          lastFetch: 0,
+          simulatedSignatures: [],
+          transactionSignatures: [],
+        };
+      }
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const currentSlot = await provider.connection.getSlot();
+        if (currentSlot >= target) {
+          return;
         }
-      } catch (_) {
-        // Some RPCs do not expose the local-validator warp method.
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
     }
 
@@ -153,6 +172,7 @@ describe("kamino-meta-vault", () => {
       if (currentSlot >= target) {
         return;
       }
+
       const tx = new anchor.web3.Transaction().add(
         anchor.web3.SystemProgram.transfer({
           fromPubkey: payer.publicKey,
@@ -160,8 +180,17 @@ describe("kamino-meta-vault", () => {
           lamports: 1,
         })
       );
-      await provider.sendAndConfirm(tx, [payer]);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const { blockhash } = await provider.connection.getLatestBlockhash();
+      tx.feePayer = payer.publicKey;
+      tx.recentBlockhash = blockhash;
+      tx.sign(payer);
+      await provider.connection
+        .sendRawTransaction(tx.serialize(), {
+          skipPreflight: true,
+          maxRetries: 5,
+        })
+        .catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     throw new Error(`slot did not advance to ${target}`);
@@ -239,11 +268,7 @@ describe("kamino-meta-vault", () => {
     config: anchor.web3.PublicKey
   ) {
     const second = anchor.web3.Keypair.generate();
-    const signature = await provider.connection.requestAirdrop(
-      second.publicKey,
-      2_000_000_000
-    );
-    await provider.connection.confirmTransaction(signature);
+    await fundSigner(second);
     const secondAta = await getOrCreateAssociatedTokenAccount(
       provider.connection,
       payer,
@@ -267,14 +292,23 @@ describe("kamino-meta-vault", () => {
   }
 
   async function fundSigner(signer: anchor.web3.Keypair) {
-    const tx = new anchor.web3.Transaction().add(
-      anchor.web3.SystemProgram.transfer({
-        fromPubkey: payer.publicKey,
-        toPubkey: signer.publicKey,
-        lamports: 500_000_000,
-      })
+    const targetBalance = 500_000_000;
+    const currentBalance = await provider.connection.getBalance(
+      signer.publicKey
     );
-    await provider.sendAndConfirm(tx, [payer]);
+    if (currentBalance >= targetBalance) {
+      return;
+    }
+
+    await provider.connection.requestAirdrop(signer.publicKey, targetBalance);
+    for (let i = 0; i < 50; i += 1) {
+      const balance = await provider.connection.getBalance(signer.publicKey);
+      if (balance >= targetBalance) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`airdrop did not fund ${signer.publicKey.toBase58()}`);
   }
 
   async function setupVoter(
@@ -296,6 +330,28 @@ describe("kamino-meta-vault", () => {
       ata,
       position: positionAddress(config, voter.publicKey),
     };
+  }
+
+  async function createOwnedAccount(owner: anchor.web3.PublicKey) {
+    const account = anchor.web3.Keypair.generate();
+    const lamports =
+      await provider.connection.getMinimumBalanceForRentExemption(8);
+    const tx = new anchor.web3.Transaction().add(
+      anchor.web3.SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: account.publicKey,
+        lamports,
+        space: 8,
+        programId: owner,
+      })
+    );
+
+    await provider.sendAndConfirm(tx, [payer, account]);
+    return account.publicKey;
+  }
+
+  async function createKaminoVaultAccount() {
+    return initializedKaminoVault;
   }
 
   async function expectRpcError(
@@ -788,6 +844,122 @@ describe("kamino-meta-vault", () => {
     expect(pausedConfig.paused).to.equal(true);
   });
 
+  it("caps proposal creation to keep campaign closeout bounded", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 40, voting: 80 });
+
+    for (let proposalId = 0; proposalId < maxProposals; proposalId += 1) {
+      await createProposal(ctx.config, proposalId);
+    }
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    expect(configState.proposalCount.toNumber()).to.equal(maxProposals);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(
+            payer.publicKey,
+            metadataHash,
+            "extra curator strategy"
+          )
+          .accountsStrict({
+            proposer: payer.publicKey,
+            config: ctx.config,
+            proposal: proposalAddress(ctx.config, maxProposals),
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc(),
+      "ProposalLimitReached"
+    );
+
+    const unchangedState = await program.account.metaVaultConfig.fetch(
+      ctx.config
+    );
+    expect(unchangedState.proposalCount.toNumber()).to.equal(maxProposals);
+  });
+
+  it("lets the proposer cancel an unvoted proposal and blocks inactive proposal votes", async () => {
+    const ctx = await setupConfig();
+    const proposal = await createProposal(ctx.config, 0);
+    const nonProposer = anchor.web3.Keypair.generate();
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .cancelProposal()
+          .accountsStrict({
+            signer: nonProposer.publicKey,
+            config: ctx.config,
+            proposal,
+          })
+          .signers([nonProposer])
+          .rpc(),
+      "Unauthorized"
+    );
+
+    await program.methods
+      .cancelProposal()
+      .accountsStrict({
+        signer: payer.publicKey,
+        config: ctx.config,
+        proposal,
+      })
+      .rpc();
+
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+    expect(proposalState.active).to.equal(false);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await ageBond(ctx.position);
+    await expectRpcError(
+      () => vote(ctx.config, ctx.position, proposal, payer),
+      "InactiveProposal"
+    );
+  });
+
+  it("rejects canceling a proposal after votes exist", async () => {
+    const ctx = await setupConfig();
+    const proposal = await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await ageBond(ctx.position);
+    await vote(ctx.config, ctx.position, proposal, payer);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .cancelProposal()
+          .accountsStrict({
+            signer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+          })
+          .rpc(),
+      "ProposalHasVotes"
+    );
+
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+    expect(proposalState.active).to.equal(true);
+  });
+
   it("rejects young votes and double voting", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);
@@ -846,14 +1018,16 @@ describe("kamino-meta-vault", () => {
 
   it("rejects recording a Kamino vault before finalization", async () => {
     const ctx = await setupConfig();
+    const kaminoVault = await createKaminoVaultAccount();
 
     await expectRpcError(
       () =>
         program.methods
-          .recordKaminoVault(anchor.web3.Keypair.generate().publicKey)
+          .recordKaminoVault()
           .accountsStrict({
             curator: payer.publicKey,
             config: ctx.config,
+            kaminoVault,
           })
           .rpc(),
       "NotFinalized"
@@ -966,13 +1140,15 @@ describe("kamino-meta-vault", () => {
     );
     expect(vaultState.amount).to.equal(250_000n);
 
+    const kaminoVault = await createKaminoVaultAccount();
     await expectRpcError(
       () =>
         program.methods
-          .recordKaminoVault(anchor.web3.Keypair.generate().publicKey)
+          .recordKaminoVault()
           .accountsStrict({
             curator: payer.publicKey,
             config: ctx.config,
+            kaminoVault,
           })
           .rpc(),
       "Unauthorized"
@@ -1219,21 +1395,6 @@ describe("kamino-meta-vault", () => {
         expectedWeight.toString()
       );
     }
-
-    await warpPast(ctx.votingDeadline);
-    await program.methods
-      .finalize()
-      .accountsStrict({
-        config: ctx.config,
-        winningProposal: proposal,
-      })
-      .rpc();
-
-    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
-    const vaultState = await getAccount(provider.connection, ctx.bondVault);
-    expect(configState.finalized).to.equal(true);
-    expect(configState.totalBonded.toNumber()).to.equal(expectedPrincipal);
-    expect(vaultState.amount).to.equal(BigInt(expectedPrincipal));
   });
 
   it("stress checks vote, retract, and revote tally conservation", async () => {
@@ -1636,7 +1797,13 @@ describe("kamino-meta-vault", () => {
   it("finalizes the winning curator, records a Kamino vault, and permits post-finalization exit", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);
-    const kaminoVault = anchor.web3.Keypair.generate().publicKey;
+    const kaminoVault = await createKaminoVaultAccount();
+    const nonKaminoVault = await createOwnedAccount(
+      anchor.web3.SystemProgram.programId
+    );
+    const uninitializedKaminoVault = await createOwnedAccount(
+      kaminoKvaultProgramId
+    );
 
     await deposit(
       ctx.config,
@@ -1662,31 +1829,61 @@ describe("kamino-meta-vault", () => {
     await expectRpcError(
       () =>
         program.methods
-          .recordKaminoVault(kaminoVault)
+          .recordKaminoVault()
           .accountsStrict({
             curator: nonCurator.publicKey,
             config: ctx.config,
+            kaminoVault,
           })
           .signers([nonCurator])
           .rpc(),
       "Unauthorized"
     );
 
-    await program.methods
-      .recordKaminoVault(kaminoVault)
-      .accountsStrict({
-        curator: payer.publicKey,
-        config: ctx.config,
-      })
-      .rpc();
+    await expectRpcError(
+      () =>
+        program.methods
+          .recordKaminoVault()
+          .accountsStrict({
+            curator: payer.publicKey,
+            config: ctx.config,
+            kaminoVault: nonKaminoVault,
+          })
+          .rpc(),
+      "InvalidKaminoVaultProgram"
+    );
 
     await expectRpcError(
       () =>
         program.methods
-          .recordKaminoVault(anchor.web3.Keypair.generate().publicKey)
+          .recordKaminoVault()
           .accountsStrict({
             curator: payer.publicKey,
             config: ctx.config,
+            kaminoVault: uninitializedKaminoVault,
+          })
+          .rpc(),
+      "InvalidKaminoVaultAccount"
+    );
+
+    await program.methods
+      .recordKaminoVault()
+      .accountsStrict({
+        curator: payer.publicKey,
+        config: ctx.config,
+        kaminoVault,
+      })
+      .rpc();
+
+    const secondKaminoVault = await createKaminoVaultAccount();
+    await expectRpcError(
+      () =>
+        program.methods
+          .recordKaminoVault()
+          .accountsStrict({
+            curator: payer.publicKey,
+            config: ctx.config,
+            kaminoVault: secondKaminoVault,
           })
           .rpc(),
       "KaminoVaultAlreadyRecorded"

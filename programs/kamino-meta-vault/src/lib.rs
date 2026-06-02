@@ -87,6 +87,10 @@ pub mod kamino_meta_vault {
         instructions::create_proposal(ctx, curator, metadata_hash, title)
     }
 
+    pub fn cancel_proposal(ctx: Context<CancelProposal>) -> Result<()> {
+        instructions::cancel_proposal(ctx)
+    }
+
     pub fn vote(ctx: Context<Vote>) -> Result<()> {
         instructions::vote(ctx)
     }
@@ -103,10 +107,7 @@ pub mod kamino_meta_vault {
         instructions::fail_campaign(ctx)
     }
 
-    pub fn record_kamino_vault(
-        ctx: Context<RecordKaminoVault>,
-        kamino_vault: Pubkey,
-    ) -> Result<()> {
-        instructions::record_kamino_vault(ctx, kamino_vault)
+    pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>) -> Result<()> {
+        instructions::record_kamino_vault(ctx)
     }
 }

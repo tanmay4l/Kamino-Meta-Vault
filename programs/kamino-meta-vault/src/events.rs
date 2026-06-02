@@ -67,6 +67,14 @@ pub struct ProposalCreated {
 }
 
 #[event]
+pub struct ProposalCanceled {
+    pub config: Pubkey,
+    pub proposal: Pubkey,
+    pub canceled_by: Pubkey,
+    pub proposal_id: u64,
+}
+
+#[event]
 pub struct VoteCast {
     pub config: Pubkey,
     pub proposal: Pubkey,

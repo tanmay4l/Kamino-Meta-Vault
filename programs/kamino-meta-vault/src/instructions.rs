@@ -4,9 +4,10 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use crate::{
     AuthorityTransferred, CampaignFailed, Deposited, Finalized, KaminoVaultRecorded,
     MetaVaultConfig, MetaVaultError, MetaVaultInitialized, PauseSet, PositionClosed,
-    ProposalCreated, StrategyProposal, VoteCast, VoteRetracted, VoterPosition, Withdrawn,
-    AUTHORITY_SEED, BOND_VAULT_SEED, CONFIG_SEED, MAX_BPS, MAX_PROPOSAL_TITLE_BYTES, POSITION_SEED,
-    PROPOSAL_SEED,
+    ProposalCanceled, ProposalCreated, StrategyProposal, VoteCast, VoteRetracted, VoterPosition,
+    Withdrawn, AUTHORITY_SEED, BOND_VAULT_SEED, CONFIG_SEED, KAMINO_KVAULT_MAINNET_PROGRAM_ID,
+    KAMINO_KVAULT_STAGING_PROGRAM_ID, KAMINO_VAULT_STATE_DISCRIMINATOR, MAX_BPS, MAX_PROPOSALS,
+    MAX_PROPOSAL_TITLE_BYTES, POSITION_SEED, PROPOSAL_SEED,
 };
 
 #[derive(Accounts)]
@@ -469,6 +470,10 @@ pub fn create_proposal(
         clock.slot <= config.voting_deadline_slot,
         MetaVaultError::VotingClosed
     );
+    require!(
+        config.proposal_count < MAX_PROPOSALS,
+        MetaVaultError::ProposalLimitReached
+    );
     require!(curator != Pubkey::default(), MetaVaultError::InvalidConfig);
     require!(
         title.len() <= MAX_PROPOSAL_TITLE_BYTES,
@@ -497,6 +502,48 @@ pub fn create_proposal(
         curator,
         proposal_id: proposal.proposal_id,
         metadata_hash,
+    });
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct CancelProposal<'info> {
+    pub signer: Signer<'info>,
+    #[account(mut)]
+    pub config: Account<'info, MetaVaultConfig>,
+    #[account(mut, has_one = config)]
+    pub proposal: Account<'info, StrategyProposal>,
+}
+
+pub fn cancel_proposal(ctx: Context<CancelProposal>) -> Result<()> {
+    let clock = Clock::get()?;
+    let config = &ctx.accounts.config;
+    let signer = ctx.accounts.signer.key();
+    require!(!config.paused, MetaVaultError::Paused);
+    require!(!config.finalized, MetaVaultError::AlreadyFinalized);
+    require!(
+        clock.slot <= config.voting_deadline_slot,
+        MetaVaultError::VotingClosed
+    );
+    require!(
+        ctx.accounts.proposal.active,
+        MetaVaultError::InactiveProposal
+    );
+    require!(
+        signer == config.authority || signer == ctx.accounts.proposal.proposer,
+        MetaVaultError::Unauthorized
+    );
+    require!(
+        ctx.accounts.proposal.support_principal == 0 && ctx.accounts.proposal.support_weight == 0,
+        MetaVaultError::ProposalHasVotes
+    );
+
+    ctx.accounts.proposal.active = false;
+    emit!(ProposalCanceled {
+        config: config.key(),
+        proposal: ctx.accounts.proposal.key(),
+        canceled_by: signer,
+        proposal_id: ctx.accounts.proposal.proposal_id,
     });
     Ok(())
 }
@@ -675,6 +722,10 @@ pub fn finalize(ctx: Context<Finalize>) -> Result<()> {
         MetaVaultError::QuorumNotReached
     );
     require!(
+        ctx.accounts.winning_proposal.active,
+        MetaVaultError::InactiveProposal
+    );
+    require!(
         ctx.accounts
             .winning_proposal
             .support_weight
@@ -780,10 +831,13 @@ pub struct RecordKaminoVault<'info> {
     pub curator: Signer<'info>,
     #[account(mut)]
     pub config: Account<'info, MetaVaultConfig>,
+    /// CHECK: owner is validated against the Kamino kvault program allowlist.
+    pub kamino_vault: UncheckedAccount<'info>,
 }
 
-pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>, kamino_vault: Pubkey) -> Result<()> {
+pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>) -> Result<()> {
     let config = &mut ctx.accounts.config;
+    let kamino_vault = ctx.accounts.kamino_vault.key();
     require!(config.finalized, MetaVaultError::NotFinalized);
     require!(
         ctx.accounts.curator.key() == config.selected_curator,
@@ -797,6 +851,14 @@ pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>, kamino_vault: Pubkey
         config.kamino_vault == Pubkey::default(),
         MetaVaultError::KaminoVaultAlreadyRecorded
     );
+    require!(
+        is_allowed_kamino_vault_program(ctx.accounts.kamino_vault.owner),
+        MetaVaultError::InvalidKaminoVaultProgram
+    );
+    require!(
+        is_initialized_kamino_vault_state(&ctx.accounts.kamino_vault)?,
+        MetaVaultError::InvalidKaminoVaultAccount
+    );
     config.kamino_vault = kamino_vault;
     emit!(KaminoVaultRecorded {
         config: config.key(),
@@ -804,6 +866,16 @@ pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>, kamino_vault: Pubkey
         kamino_vault,
     });
     Ok(())
+}
+
+fn is_allowed_kamino_vault_program(owner: &Pubkey) -> bool {
+    *owner == KAMINO_KVAULT_MAINNET_PROGRAM_ID || *owner == KAMINO_KVAULT_STAGING_PROGRAM_ID
+}
+
+fn is_initialized_kamino_vault_state(kamino_vault: &UncheckedAccount) -> Result<bool> {
+    let data = kamino_vault.try_borrow_data()?;
+    Ok(data.len() >= KAMINO_VAULT_STATE_DISCRIMINATOR.len()
+        && data[..KAMINO_VAULT_STATE_DISCRIMINATOR.len()] == KAMINO_VAULT_STATE_DISCRIMINATOR)
 }
 
 fn time_weight(amount: u64, start_slot: u64, now_slot: u64) -> Result<u128> {
