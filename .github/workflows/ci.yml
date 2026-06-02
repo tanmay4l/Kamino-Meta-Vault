@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Sync localnet program id
+        run: anchor keys sync
+
       - name: Validate
         run: yarn validate:local
 
