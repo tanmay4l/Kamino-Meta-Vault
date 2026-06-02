@@ -3,7 +3,7 @@
   "scripts": {
     "build": "anchor build",
     "test": "anchor test",
-    "validate:local": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && yarn lint && npx tsc --noEmit && anchor build && anchor test",
+    "validate:local": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && yarn lint && anchor build && npx tsc --noEmit && anchor test",
     "lint:fix": "prettier \"**/*.{js,ts,json,yml}\" --ignore-path .prettierignore --write",
     "lint": "prettier \"**/*.{js,ts,json,yml}\" --ignore-path .prettierignore --check"
   },
