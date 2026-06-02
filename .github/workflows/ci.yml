@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
+
+      - name: Install Solana CLI
+        shell: bash
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor CLI
+        shell: bash
+        run: |
+          cargo install --git https://github.com/solana-foundation/anchor avm --locked --force
+          avm install 1.0.0
+          avm use 1.0.0
+          echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Validate
+        run: yarn validate:local
+
+      - name: Write artifact checksums
+        shell: bash
+        run: |
+          mkdir -p ci-artifacts
+          shasum -a 256 \
+            target/deploy/kamino_meta_vault.so \
+            target/idl/kamino_meta_vault.json \
+            target/types/kamino_meta_vault.ts > ci-artifacts/sha256.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kamino-meta-vault-build
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ci-artifacts/sha256.txt
+            target/deploy/kamino_meta_vault.so
+            target/idl/kamino_meta_vault.json
+            target/types/kamino_meta_vault.ts

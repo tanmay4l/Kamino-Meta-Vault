@@ -1,0 +1,26 @@
+.anchor/
+.surfpool/
+.yarn/
+.DS_Store
+Thumbs.db
+
+# Build and dependency artifacts.
+target/
+node_modules/
+dist/
+build/
+ci-artifacts/
+test-ledger/
+*.log
+*.pid
+*.profraw
+*.profdata
+tsconfig.tsbuildinfo
+**/*.rs.bk
+
+# Local operator state, secrets, and generated keypairs.
+.env
+.env.local
+*.local.json
+*-keypair.json
+target/deploy/*-keypair.json
