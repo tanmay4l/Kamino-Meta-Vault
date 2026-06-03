@@ -146,8 +146,8 @@ fn initialize_config_state(
 ) -> Result<()> {
     let clock = Clock::get()?;
     require!(
-        params.deposit_deadline_slot >= clock.slot
-            && params.voting_deadline_slot >= params.deposit_deadline_slot,
+        params.deposit_deadline_slot > clock.slot
+            && params.voting_deadline_slot > params.deposit_deadline_slot,
         MetaVaultError::InvalidConfig
     );
     require!(params.min_deposit_amount > 0, MetaVaultError::InvalidConfig);

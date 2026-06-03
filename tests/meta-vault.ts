@@ -459,6 +459,71 @@ describe("kamino-meta-vault", () => {
     expect(firstState.bondVault.equals(secondState.bondVault)).to.equal(false);
   });
 
+  it("rejects campaign windows without strict deposit and voting phases", async () => {
+    const mint = await createMint(
+      provider.connection,
+      payer,
+      payer.publicKey,
+      null,
+      6
+    );
+    const currentSlot = await provider.connection.getSlot();
+
+    async function expectInvalidWindow(
+      configSeed: Buffer,
+      depositDeadline: number,
+      votingDeadline: number
+    ) {
+      const [config] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("config"), mint.toBuffer(), configSeed],
+        program.programId
+      );
+      const [daoAuthority] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("authority"), config.toBuffer()],
+        program.programId
+      );
+      const [bondVault] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("bond_vault"), config.toBuffer()],
+        program.programId
+      );
+
+      await expectRpcError(
+        () =>
+          program.methods
+            .initializeConfigWithSeed(
+              Array.from(configSeed),
+              new anchor.BN(depositDeadline),
+              new anchor.BN(votingDeadline),
+              new anchor.BN(100_000),
+              5_000
+            )
+            .accountsStrict({
+              payer: payer.publicKey,
+              tokenMint: mint,
+              config,
+              daoAuthority,
+              bondVault,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            })
+            .rpc(),
+        "InvalidConfig"
+      );
+    }
+
+    await expectInvalidWindow(
+      Buffer.alloc(32, 3),
+      currentSlot,
+      currentSlot + 5
+    );
+    await expectInvalidWindow(
+      Buffer.alloc(32, 4),
+      currentSlot + 20,
+      currentSlot + 20
+    );
+  });
+
   it("rejects proposals without a title or metadata commitment", async () => {
     const ctx = await setupConfig();
     const proposal = proposalAddress(ctx.config, 0);
@@ -678,7 +743,7 @@ describe("kamino-meta-vault", () => {
   });
 
   it("rejects deposits after the deposit deadline", async () => {
-    const ctx = await setupConfig(5_000, { deposit: 1, voting: 1 });
+    const ctx = await setupConfig(5_000, { deposit: 5, voting: 8 });
     await warpPast(ctx.depositDeadline);
 
     await expectRpcError(
