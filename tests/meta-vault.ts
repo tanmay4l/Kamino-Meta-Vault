@@ -585,6 +585,27 @@ describe("kamino-meta-vault", () => {
   it("rejects proposals without a title or metadata commitment", async () => {
     const ctx = await setupConfig();
     const proposal = proposalAddress(ctx.config, 0);
+    const nonAuthority = anchor.web3.Keypair.generate();
+    await fundSigner(nonAuthority);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(
+            payer.publicKey,
+            metadataHash,
+            "USDC conservative curator"
+          )
+          .accountsStrict({
+            proposer: nonAuthority.publicKey,
+            config: ctx.config,
+            proposal,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([nonAuthority])
+          .rpc(),
+      "Unauthorized"
+    );
 
     for (const title of ["", " \t\n"]) {
       await expectRpcError(

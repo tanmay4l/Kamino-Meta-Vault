@@ -487,6 +487,10 @@ pub fn create_proposal(
     require!(!config.paused, MetaVaultError::Paused);
     require!(!config.finalized, MetaVaultError::AlreadyFinalized);
     require!(
+        ctx.accounts.proposer.key() == config.authority,
+        MetaVaultError::Unauthorized
+    );
+    require!(
         clock.slot <= config.voting_deadline_slot,
         MetaVaultError::VotingClosed
     );

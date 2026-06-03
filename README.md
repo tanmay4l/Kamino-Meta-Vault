@@ -34,7 +34,7 @@ Current backend bar:
 - Campaign setup rejects zero minimum deposits and out-of-range quorum values.
 - Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
 - Voting tallies freeze at the voting deadline; votes cannot be cast or retracted after the window closes.
-- Proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
+- Proposal creation is authority-gated, proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
 - Strategy proposals require a non-empty title and nonzero metadata hash.
 - Authority can be handed off through a co-signed transfer path for multisig acceptance.
 - Campaigns can finalize successfully or fail when quorum/majority rules are not met.
