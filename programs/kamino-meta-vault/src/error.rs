@@ -26,6 +26,10 @@ pub enum MetaVaultError {
     VoteTooYoung,
     #[msg("Proposal is not active")]
     InactiveProposal,
+    #[msg("Proposal title is empty")]
+    InvalidProposalTitle,
+    #[msg("Proposal metadata hash is empty")]
+    InvalidProposalMetadata,
     #[msg("Proposal does not belong to this config")]
     ProposalConfigMismatch,
     #[msg("Quorum was not reached")]

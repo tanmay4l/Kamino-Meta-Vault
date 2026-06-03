@@ -476,6 +476,11 @@ pub fn create_proposal(
         MetaVaultError::ProposalLimitReached
     );
     require!(curator != Pubkey::default(), MetaVaultError::InvalidConfig);
+    require!(!title.is_empty(), MetaVaultError::InvalidProposalTitle);
+    require!(
+        metadata_hash != [0; 32],
+        MetaVaultError::InvalidProposalMetadata
+    );
     require!(
         title.len() <= MAX_PROPOSAL_TITLE_BYTES,
         MetaVaultError::InvalidConfig

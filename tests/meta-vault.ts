@@ -459,6 +459,52 @@ describe("kamino-meta-vault", () => {
     expect(firstState.bondVault.equals(secondState.bondVault)).to.equal(false);
   });
 
+  it("rejects proposals without a title or metadata commitment", async () => {
+    const ctx = await setupConfig();
+    const proposal = proposalAddress(ctx.config, 0);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(payer.publicKey, metadataHash, "")
+          .accountsStrict({
+            proposer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc(),
+      "InvalidProposalTitle"
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(
+            payer.publicKey,
+            Array(32).fill(0),
+            "USDC conservative curator"
+          )
+          .accountsStrict({
+            proposer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc(),
+      "InvalidProposalMetadata"
+    );
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    expect(configState.proposalCount.toNumber()).to.equal(0);
+
+    await createProposal(ctx.config, 0);
+    const validConfigState = await program.account.metaVaultConfig.fetch(
+      ctx.config
+    );
+    expect(validConfigState.proposalCount.toNumber()).to.equal(1);
+  });
+
   it("accepts a bond, records a proposal vote, and blocks withdrawal while voted", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);

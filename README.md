@@ -32,6 +32,7 @@ Current backend bar:
 - Contract instructions have integration coverage through the public Anchor interface.
 - Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
 - Proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
+- Strategy proposals require a non-empty title and nonzero metadata hash.
 - Campaigns can finalize successfully or fail when quorum/majority rules are not met.
 - Recorded Kamino vault accounts must be owned by an allowed Kamino kvault program, carry the Kamino `VaultState` discriminator, match the campaign mint, and use the DAO PDA as vault admin.
 - CI runs formatting, clippy, TypeScript checking, Anchor build, integration tests, and build artifact checksums.
