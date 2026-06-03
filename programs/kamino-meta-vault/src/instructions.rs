@@ -375,7 +375,6 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
     let config_key = ctx.accounts.config.key();
     let position_key = ctx.accounts.position.key();
     let config = &mut ctx.accounts.config;
-    require!(!config.paused, MetaVaultError::Paused);
     require!(amount > 0, MetaVaultError::ZeroAmount);
     require!(
         config.finalized || ctx.accounts.position.voted_proposal == Pubkey::default(),

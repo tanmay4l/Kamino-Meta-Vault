@@ -839,7 +839,7 @@ describe("kamino-meta-vault", () => {
     );
   });
 
-  it("enforces pause authority and blocks deposits while paused", async () => {
+  it("enforces pause authority, blocks deposits, and permits withdrawals while paused", async () => {
     const ctx = await setupConfig();
     const nonAuthority = anchor.web3.Keypair.generate();
 
@@ -854,6 +854,15 @@ describe("kamino-meta-vault", () => {
           .signers([nonAuthority])
           .rpc(),
       "Unauthorized"
+    );
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
     );
 
     await program.methods
@@ -876,6 +885,29 @@ describe("kamino-meta-vault", () => {
         ),
       "Paused"
     );
+
+    await program.methods
+      .withdraw(new anchor.BN(100_000))
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        ownerTokenAccount: ctx.ownerAta,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+    expect(configState.paused).to.equal(true);
+    expect(configState.totalBonded.toNumber()).to.equal(150_000);
+    expect(positionState.bondedAmount.toNumber()).to.equal(150_000);
+    expect(vaultState.amount).to.equal(150_000n);
   });
 
   it("rejects spoofed token accounts and PDA authorities", async () => {
