@@ -224,9 +224,28 @@ pub fn transfer_authority(ctx: Context<TransferAuthority>, new_authority: Pubkey
         new_authority != Pubkey::default(),
         MetaVaultError::InvalidConfig
     );
-    let config_key = ctx.accounts.config.key();
-    let previous_authority = ctx.accounts.config.authority;
-    ctx.accounts.config.authority = new_authority;
+    transfer_authority_to(&mut ctx.accounts.config, new_authority)
+}
+
+#[derive(Accounts)]
+pub struct TransferAuthorityConfirmed<'info> {
+    pub authority: Signer<'info>,
+    pub new_authority: Signer<'info>,
+    #[account(mut, has_one = authority @ MetaVaultError::Unauthorized)]
+    pub config: Account<'info, MetaVaultConfig>,
+}
+
+pub fn transfer_authority_confirmed(ctx: Context<TransferAuthorityConfirmed>) -> Result<()> {
+    transfer_authority_to(&mut ctx.accounts.config, ctx.accounts.new_authority.key())
+}
+
+fn transfer_authority_to(
+    config: &mut Account<MetaVaultConfig>,
+    new_authority: Pubkey,
+) -> Result<()> {
+    let config_key = config.key();
+    let previous_authority = config.authority;
+    config.authority = new_authority;
     emit!(AuthorityTransferred {
         config: config_key,
         previous_authority,

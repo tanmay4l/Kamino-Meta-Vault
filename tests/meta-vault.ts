@@ -1050,6 +1050,80 @@ describe("kamino-meta-vault", () => {
     expect(pausedConfig.paused).to.equal(true);
   });
 
+  it("supports a co-signed authority handoff", async () => {
+    const ctx = await setupConfig();
+    const newAuthority = anchor.web3.Keypair.generate();
+    const nonAuthority = anchor.web3.Keypair.generate();
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .transferAuthorityConfirmed()
+          .accountsStrict({
+            authority: nonAuthority.publicKey,
+            newAuthority: newAuthority.publicKey,
+            config: ctx.config,
+          })
+          .signers([nonAuthority, newAuthority])
+          .rpc(),
+      "Unauthorized"
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .transferAuthorityConfirmed()
+          .accountsStrict({
+            authority: payer.publicKey,
+            newAuthority: newAuthority.publicKey,
+            config: ctx.config,
+          })
+          .rpc(),
+      "Signature verification failed"
+    );
+
+    await program.methods
+      .transferAuthorityConfirmed()
+      .accountsStrict({
+        authority: payer.publicKey,
+        newAuthority: newAuthority.publicKey,
+        config: ctx.config,
+      })
+      .signers([newAuthority])
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    expect(configState.authority.toBase58()).to.equal(
+      newAuthority.publicKey.toBase58()
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .setPaused(true)
+          .accountsStrict({
+            authority: payer.publicKey,
+            config: ctx.config,
+          })
+          .rpc(),
+      "Unauthorized"
+    );
+
+    await program.methods
+      .setPaused(true)
+      .accountsStrict({
+        authority: newAuthority.publicKey,
+        config: ctx.config,
+      })
+      .signers([newAuthority])
+      .rpc();
+
+    const pausedConfig = await program.account.metaVaultConfig.fetch(
+      ctx.config
+    );
+    expect(pausedConfig.paused).to.equal(true);
+  });
+
   it("caps proposal creation to keep campaign closeout bounded", async () => {
     const ctx = await setupConfig(5_000, { deposit: 40, voting: 80 });
 

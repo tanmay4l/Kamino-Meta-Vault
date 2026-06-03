@@ -66,6 +66,10 @@ pub mod kamino_meta_vault {
         instructions::transfer_authority(ctx, new_authority)
     }
 
+    pub fn transfer_authority_confirmed(ctx: Context<TransferAuthorityConfirmed>) -> Result<()> {
+        instructions::transfer_authority_confirmed(ctx)
+    }
+
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         instructions::deposit(ctx, amount)
     }
