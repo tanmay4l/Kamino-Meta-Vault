@@ -476,7 +476,10 @@ pub fn create_proposal(
         MetaVaultError::ProposalLimitReached
     );
     require!(curator != Pubkey::default(), MetaVaultError::InvalidConfig);
-    require!(!title.is_empty(), MetaVaultError::InvalidProposalTitle);
+    require!(
+        has_visible_title(&title),
+        MetaVaultError::InvalidProposalTitle
+    );
     require!(
         metadata_hash != [0; 32],
         MetaVaultError::InvalidProposalMetadata
@@ -510,6 +513,10 @@ pub fn create_proposal(
         metadata_hash,
     });
     Ok(())
+}
+
+fn has_visible_title(title: &str) -> bool {
+    title.bytes().any(|byte| !byte.is_ascii_whitespace())
 }
 
 #[derive(Accounts)]

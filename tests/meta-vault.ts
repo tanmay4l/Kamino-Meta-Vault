@@ -463,19 +463,21 @@ describe("kamino-meta-vault", () => {
     const ctx = await setupConfig();
     const proposal = proposalAddress(ctx.config, 0);
 
-    await expectRpcError(
-      () =>
-        program.methods
-          .createProposal(payer.publicKey, metadataHash, "")
-          .accountsStrict({
-            proposer: payer.publicKey,
-            config: ctx.config,
-            proposal,
-            systemProgram: anchor.web3.SystemProgram.programId,
-          })
-          .rpc(),
-      "InvalidProposalTitle"
-    );
+    for (const title of ["", " \t\n"]) {
+      await expectRpcError(
+        () =>
+          program.methods
+            .createProposal(payer.publicKey, metadataHash, title)
+            .accountsStrict({
+              proposer: payer.publicKey,
+              config: ctx.config,
+              proposal,
+              systemProgram: anchor.web3.SystemProgram.programId,
+            })
+            .rpc(),
+        "InvalidProposalTitle"
+      );
+    }
 
     await expectRpcError(
       () =>
