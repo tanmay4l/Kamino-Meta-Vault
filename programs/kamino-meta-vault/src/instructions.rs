@@ -839,6 +839,7 @@ pub struct RecordKaminoVault<'info> {
 pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let kamino_vault = ctx.accounts.kamino_vault.key();
+    require!(!config.paused, MetaVaultError::Paused);
     require!(config.finalized, MetaVaultError::NotFinalized);
     require!(
         ctx.accounts.curator.key() == config.selected_curator,

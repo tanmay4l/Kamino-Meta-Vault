@@ -1932,6 +1932,35 @@ describe("kamino-meta-vault", () => {
     );
 
     await program.methods
+      .setPaused(true)
+      .accountsStrict({
+        authority: payer.publicKey,
+        config: ctx.config,
+      })
+      .rpc();
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .recordKaminoVault()
+          .accountsStrict({
+            curator: payer.publicKey,
+            config: ctx.config,
+            kaminoVault,
+          })
+          .rpc(),
+      "Paused"
+    );
+
+    await program.methods
+      .setPaused(false)
+      .accountsStrict({
+        authority: payer.publicKey,
+        config: ctx.config,
+      })
+      .rpc();
+
+    await program.methods
       .recordKaminoVault()
       .accountsStrict({
         curator: payer.publicKey,
