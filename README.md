@@ -31,6 +31,7 @@ Current backend bar:
 
 - Contract instructions have integration coverage through the public Anchor interface.
 - Campaign setup requires strictly ordered deposit and voting windows.
+- Campaign setup rejects zero minimum deposits and out-of-range quorum values.
 - Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
 - Proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
 - Strategy proposals require a non-empty title and nonzero metadata hash.

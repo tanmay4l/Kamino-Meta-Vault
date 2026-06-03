@@ -524,6 +524,64 @@ describe("kamino-meta-vault", () => {
     );
   });
 
+  it("rejects invalid minimum deposit and quorum settings", async () => {
+    const mint = await createMint(
+      provider.connection,
+      payer,
+      payer.publicKey,
+      null,
+      6
+    );
+    const currentSlot = await provider.connection.getSlot();
+
+    async function expectInvalidConfig(
+      configSeed: Buffer,
+      minDepositAmount: number,
+      quorumBps: number
+    ) {
+      const [config] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("config"), mint.toBuffer(), configSeed],
+        program.programId
+      );
+      const [daoAuthority] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("authority"), config.toBuffer()],
+        program.programId
+      );
+      const [bondVault] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("bond_vault"), config.toBuffer()],
+        program.programId
+      );
+
+      await expectRpcError(
+        () =>
+          program.methods
+            .initializeConfigWithSeed(
+              Array.from(configSeed),
+              new anchor.BN(currentSlot + 20),
+              new anchor.BN(currentSlot + 30),
+              new anchor.BN(minDepositAmount),
+              quorumBps
+            )
+            .accountsStrict({
+              payer: payer.publicKey,
+              tokenMint: mint,
+              config,
+              daoAuthority,
+              bondVault,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            })
+            .rpc(),
+        "InvalidConfig"
+      );
+    }
+
+    await expectInvalidConfig(Buffer.alloc(32, 5), 0, 5_000);
+    await expectInvalidConfig(Buffer.alloc(32, 6), 100_000, 0);
+    await expectInvalidConfig(Buffer.alloc(32, 7), 100_000, 10_001);
+  });
+
   it("rejects proposals without a title or metadata commitment", async () => {
     const ctx = await setupConfig();
     const proposal = proposalAddress(ctx.config, 0);
