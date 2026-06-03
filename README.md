@@ -33,7 +33,7 @@ Current backend bar:
 - Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
 - Proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
 - Campaigns can finalize successfully or fail when quorum/majority rules are not met.
-- Recorded Kamino vault accounts must be owned by an allowed Kamino kvault program and carry the Kamino `VaultState` discriminator.
+- Recorded Kamino vault accounts must be owned by an allowed Kamino kvault program, carry the Kamino `VaultState` discriminator, match the campaign mint, and use the DAO PDA as vault admin.
 - CI runs formatting, clippy, TypeScript checking, Anchor build, integration tests, and build artifact checksums.
 
 Not production complete:

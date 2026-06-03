@@ -6,7 +6,8 @@ use crate::{
     MetaVaultConfig, MetaVaultError, MetaVaultInitialized, PauseSet, PositionClosed,
     ProposalCanceled, ProposalCreated, StrategyProposal, VoteCast, VoteRetracted, VoterPosition,
     Withdrawn, AUTHORITY_SEED, BOND_VAULT_SEED, CONFIG_SEED, KAMINO_KVAULT_MAINNET_PROGRAM_ID,
-    KAMINO_KVAULT_STAGING_PROGRAM_ID, KAMINO_VAULT_STATE_DISCRIMINATOR, MAX_BPS, MAX_PROPOSALS,
+    KAMINO_KVAULT_STAGING_PROGRAM_ID, KAMINO_VAULT_STATE_ADMIN_OFFSET,
+    KAMINO_VAULT_STATE_DISCRIMINATOR, KAMINO_VAULT_STATE_TOKEN_MINT_OFFSET, MAX_BPS, MAX_PROPOSALS,
     MAX_PROPOSAL_TITLE_BYTES, POSITION_SEED, PROPOSAL_SEED,
 };
 
@@ -856,8 +857,17 @@ pub fn record_kamino_vault(ctx: Context<RecordKaminoVault>) -> Result<()> {
         MetaVaultError::InvalidKaminoVaultProgram
     );
     require!(
-        is_initialized_kamino_vault_state(&ctx.accounts.kamino_vault)?,
+        ctx.accounts.kamino_vault.data_len() >= KAMINO_VAULT_STATE_TOKEN_MINT_OFFSET + 32,
         MetaVaultError::InvalidKaminoVaultAccount
+    );
+    let vault_state = kamino_vault_state_header(&ctx.accounts.kamino_vault)?;
+    require!(
+        vault_state.token_mint == config.token_mint,
+        MetaVaultError::InvalidKaminoVaultMint
+    );
+    require!(
+        vault_state.vault_admin_authority == config.dao_authority,
+        MetaVaultError::InvalidKaminoVaultAuthority
     );
     config.kamino_vault = kamino_vault;
     emit!(KaminoVaultRecorded {
@@ -872,10 +882,38 @@ fn is_allowed_kamino_vault_program(owner: &Pubkey) -> bool {
     *owner == KAMINO_KVAULT_MAINNET_PROGRAM_ID || *owner == KAMINO_KVAULT_STAGING_PROGRAM_ID
 }
 
-fn is_initialized_kamino_vault_state(kamino_vault: &UncheckedAccount) -> Result<bool> {
+struct KaminoVaultStateHeader {
+    vault_admin_authority: Pubkey,
+    token_mint: Pubkey,
+}
+
+fn kamino_vault_state_header(kamino_vault: &UncheckedAccount) -> Result<KaminoVaultStateHeader> {
     let data = kamino_vault.try_borrow_data()?;
-    Ok(data.len() >= KAMINO_VAULT_STATE_DISCRIMINATOR.len()
-        && data[..KAMINO_VAULT_STATE_DISCRIMINATOR.len()] == KAMINO_VAULT_STATE_DISCRIMINATOR)
+    require!(
+        data.len() >= KAMINO_VAULT_STATE_TOKEN_MINT_OFFSET + 32,
+        MetaVaultError::InvalidKaminoVaultAccount
+    );
+    require!(
+        data[..KAMINO_VAULT_STATE_DISCRIMINATOR.len()] == KAMINO_VAULT_STATE_DISCRIMINATOR,
+        MetaVaultError::InvalidKaminoVaultAccount
+    );
+
+    Ok(KaminoVaultStateHeader {
+        vault_admin_authority: read_pubkey_at(&data, KAMINO_VAULT_STATE_ADMIN_OFFSET)?,
+        token_mint: read_pubkey_at(&data, KAMINO_VAULT_STATE_TOKEN_MINT_OFFSET)?,
+    })
+}
+
+fn read_pubkey_at(data: &[u8], offset: usize) -> Result<Pubkey> {
+    let end = offset
+        .checked_add(32)
+        .ok_or(MetaVaultError::ArithmeticOverflow)?;
+    let bytes: [u8; 32] = data
+        .get(offset..end)
+        .ok_or(MetaVaultError::InvalidKaminoVaultAccount)?
+        .try_into()
+        .map_err(|_| MetaVaultError::InvalidKaminoVaultAccount)?;
+    Ok(Pubkey::new_from_array(bytes))
 }
 
 fn time_weight(amount: u64, start_slot: u64, now_slot: u64) -> Result<u128> {

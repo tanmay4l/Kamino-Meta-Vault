@@ -25,4 +25,12 @@ bind_address = "127.0.0.1"
 address = "3WG4wtgB2Pqz1d4z3ca3NJoNDa6L33UKMinEBj8L4VLk"
 filename = "tests/fixtures/kamino-vault-state.json"
 
+[[test.validator.account]]
+address = "DwR2UyEQpSMuvvJDW4kFx3ceEixTfNGe6k9tQ6xkAZbn"
+filename = "tests/fixtures/kamino-vault-state-wrong-admin.json"
+
+[[test.validator.account]]
+address = "CXrSsH1HTGNa4Z21KpkexaL36kHEDY4MQBBtxtErgRu6"
+filename = "tests/fixtures/kamino-vault-state-wrong-mint.json"
+
 [hooks]

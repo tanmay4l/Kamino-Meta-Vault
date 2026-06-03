@@ -48,6 +48,10 @@ pub enum MetaVaultError {
     InvalidKaminoVaultProgram,
     #[msg("Kamino vault account is not an initialized Kamino VaultState")]
     InvalidKaminoVaultAccount,
+    #[msg("Kamino vault token mint does not match this campaign")]
+    InvalidKaminoVaultMint,
+    #[msg("Kamino vault admin authority does not match the DAO authority")]
+    InvalidKaminoVaultAuthority,
     #[msg("Unauthorized")]
     Unauthorized,
     #[msg("Arithmetic overflow")]

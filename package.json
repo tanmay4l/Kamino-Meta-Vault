@@ -2,8 +2,10 @@
   "license": "ISC",
   "scripts": {
     "build": "anchor build",
-    "test": "anchor test --validator legacy",
-    "validate:local": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && yarn lint && anchor build && npx tsc --noEmit && anchor test --validator legacy",
+    "clean:test-ledger": "rm -rf test-ledger .anchor/test-ledger",
+    "prepare:fixtures": "node tests/fixtures/generate-kamino-vault-fixtures.js",
+    "test": "yarn clean:test-ledger && yarn prepare:fixtures && anchor test --validator legacy",
+    "validate:local": "cargo fmt --check && cargo clippy --all-targets -- -D warnings && yarn lint && anchor build && npx tsc --noEmit && yarn clean:test-ledger && yarn prepare:fixtures && anchor test --validator legacy",
     "lint:fix": "prettier \"**/*.{js,ts,json,yml}\" --ignore-path .prettierignore --write",
     "lint": "prettier \"**/*.{js,ts,json,yml}\" --ignore-path .prettierignore --check"
   },

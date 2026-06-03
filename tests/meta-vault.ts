@@ -27,17 +27,33 @@ describe("kamino-meta-vault", () => {
   const initializedKaminoVault = new anchor.web3.PublicKey(
     "3WG4wtgB2Pqz1d4z3ca3NJoNDa6L33UKMinEBj8L4VLk"
   );
+  const wrongAdminKaminoVault = new anchor.web3.PublicKey(
+    "DwR2UyEQpSMuvvJDW4kFx3ceEixTfNGe6k9tQ6xkAZbn"
+  );
+  const wrongMintKaminoVault = new anchor.web3.PublicKey(
+    "CXrSsH1HTGNa4Z21KpkexaL36kHEDY4MQBBtxtErgRu6"
+  );
+  const initializedKaminoVaultMint = anchor.web3.Keypair.fromSecretKey(
+    Uint8Array.from([
+      228, 49, 22, 82, 133, 119, 6, 218, 2, 191, 190, 238, 145, 67, 69, 181, 47,
+      165, 121, 103, 176, 86, 208, 222, 39, 187, 5, 63, 47, 213, 7, 92, 96, 151,
+      31, 140, 5, 43, 88, 244, 183, 88, 157, 8, 166, 1, 140, 194, 101, 2, 135,
+      129, 86, 134, 75, 109, 232, 203, 30, 99, 71, 69, 42, 121,
+    ])
+  );
 
   async function setupConfig(
     quorumBps = 5_000,
-    deadlineOffsets = { deposit: 20, voting: 24 }
+    deadlineOffsets = { deposit: 20, voting: 24 },
+    mintKeypair?: anchor.web3.Keypair
   ) {
     const mint = await createMint(
       provider.connection,
       payer,
       payer.publicKey,
       null,
-      6
+      6,
+      mintKeypair
     );
     const ownerAta = await getOrCreateAssociatedTokenAccount(
       provider.connection,
@@ -1814,7 +1830,11 @@ describe("kamino-meta-vault", () => {
   });
 
   it("finalizes the winning curator, records a Kamino vault, and permits post-finalization exit", async () => {
-    const ctx = await setupConfig();
+    const ctx = await setupConfig(
+      5_000,
+      { deposit: 20, voting: 24 },
+      initializedKaminoVaultMint
+    );
     const proposal = await createProposal(ctx.config, 0);
     const kaminoVault = await createKaminoVaultAccount();
     const nonKaminoVault = await createOwnedAccount(
@@ -1883,6 +1903,32 @@ describe("kamino-meta-vault", () => {
           })
           .rpc(),
       "InvalidKaminoVaultAccount"
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .recordKaminoVault()
+          .accountsStrict({
+            curator: payer.publicKey,
+            config: ctx.config,
+            kaminoVault: wrongAdminKaminoVault,
+          })
+          .rpc(),
+      "InvalidKaminoVaultAuthority"
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .recordKaminoVault()
+          .accountsStrict({
+            curator: payer.publicKey,
+            config: ctx.config,
+            kaminoVault: wrongMintKaminoVault,
+          })
+          .rpc(),
+      "InvalidKaminoVaultMint"
     );
 
     await program.methods
