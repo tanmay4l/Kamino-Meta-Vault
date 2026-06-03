@@ -564,10 +564,7 @@ pub fn cancel_proposal(ctx: Context<CancelProposal>) -> Result<()> {
         ctx.accounts.proposal.active,
         MetaVaultError::InactiveProposal
     );
-    require!(
-        signer == config.authority || signer == ctx.accounts.proposal.proposer,
-        MetaVaultError::Unauthorized
-    );
+    require!(signer == config.authority, MetaVaultError::Unauthorized);
     require!(
         ctx.accounts.proposal.support_principal == 0 && ctx.accounts.proposal.support_weight == 0,
         MetaVaultError::ProposalHasVotes

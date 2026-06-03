@@ -1074,6 +1074,7 @@ describe("kamino-meta-vault", () => {
     const ctx = await setupConfig();
     const newAuthority = anchor.web3.Keypair.generate();
     const nonAuthority = anchor.web3.Keypair.generate();
+    const proposal = await createProposal(ctx.config, 0);
 
     await expectRpcError(
       () =>
@@ -1112,6 +1113,34 @@ describe("kamino-meta-vault", () => {
     expect(configState.authority.toBase58()).to.equal(
       newAuthority.publicKey.toBase58()
     );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .cancelProposal()
+          .accountsStrict({
+            signer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+          })
+          .rpc(),
+      "Unauthorized"
+    );
+
+    await program.methods
+      .cancelProposal()
+      .accountsStrict({
+        signer: newAuthority.publicKey,
+        config: ctx.config,
+        proposal,
+      })
+      .signers([newAuthority])
+      .rpc();
+
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+    expect(proposalState.active).to.equal(false);
 
     await expectRpcError(
       () =>
