@@ -908,6 +908,43 @@ describe("kamino-meta-vault", () => {
     expect(configState.totalBonded.toNumber()).to.equal(150_000);
     expect(positionState.bondedAmount.toNumber()).to.equal(150_000);
     expect(vaultState.amount).to.equal(150_000n);
+
+    await program.methods
+      .withdraw(new anchor.BN(150_000))
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        ownerTokenAccount: ctx.ownerAta,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    await program.methods
+      .closePosition()
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+      })
+      .rpc();
+
+    const closedPosition = await program.account.voterPosition.fetchNullable(
+      ctx.position
+    );
+    const emptyConfigState = await program.account.metaVaultConfig.fetch(
+      ctx.config
+    );
+    const emptyVaultState = await getAccount(
+      provider.connection,
+      ctx.bondVault
+    );
+    expect(closedPosition).to.equal(null);
+    expect(emptyConfigState.paused).to.equal(true);
+    expect(emptyConfigState.totalBonded.toNumber()).to.equal(0);
+    expect(emptyVaultState.amount).to.equal(0n);
   });
 
   it("rejects spoofed token accounts and PDA authorities", async () => {
