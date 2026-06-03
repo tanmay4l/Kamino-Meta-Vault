@@ -24,3 +24,21 @@ yarn validate:local
 ## Status
 
 This is devnet-stage code, not audited production infrastructure.
+
+## Production Bar
+
+Current backend bar:
+
+- Contract instructions have integration coverage through the public Anchor interface.
+- Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
+- Proposal count is bounded, and unvoted proposals can be canceled by the proposer or config authority.
+- Campaigns can finalize successfully or fail when quorum/majority rules are not met.
+- Recorded Kamino vault accounts must be owned by an allowed Kamino kvault program and carry the Kamino `VaultState` discriminator.
+- CI runs formatting, clippy, TypeScript checking, Anchor build, integration tests, and build artifact checksums.
+
+Not production complete:
+
+- No independent audit has been completed.
+- The program records a selected Kamino vault; it does not create or manage Kamino vaults by CPI.
+- Devnet upgrades should be executed through the configured upgrade authority flow before claiming a new binary is deployed.
+- Mainnet launch needs a fresh audit, reproducible build hash, upgrade authority policy, monitoring, and incident runbook.

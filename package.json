@@ -9,16 +9,7 @@
   },
   "dependencies": {
     "@anchor-lang/core": "^1.0.0",
-    "@kamino-finance/farms-sdk": "3.2.24",
-    "@kamino-finance/klend-sdk": "8.0.2",
-    "@solana-program/token": "^0.6.0",
-    "@solana/kit": "^2.3.0",
-    "@solana/spl-token": "^0.4.14",
-    "@sqds/multisig": "2.1.4",
-    "decimal.js": "^10.4.3"
-  },
-  "resolutions": {
-    "@kamino-finance/farms-sdk": "3.2.24"
+    "@solana/spl-token": "^0.4.14"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

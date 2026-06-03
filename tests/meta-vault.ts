@@ -184,13 +184,32 @@ describe("kamino-meta-vault", () => {
       tx.feePayer = payer.publicKey;
       tx.recentBlockhash = blockhash;
       tx.sign(payer);
-      await provider.connection
+      const signature = await provider.connection
         .sendRawTransaction(tx.serialize(), {
-          skipPreflight: true,
-          maxRetries: 5,
+          skipPreflight: false,
+          maxRetries: 10,
         })
-        .catch(() => undefined);
-      await new Promise((resolve) => setTimeout(resolve, 50));
+        .catch(() => null);
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const nextSlot = await provider.connection.getSlot();
+        if (nextSlot >= target) {
+          return;
+        }
+        if (signature) {
+          const status = await provider.connection.getSignatureStatuses([
+            signature,
+          ]);
+          const value = status.value[0];
+          if (value?.err) {
+            break;
+          }
+          if (value?.confirmationStatus) {
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
 
     throw new Error(`slot did not advance to ${target}`);
