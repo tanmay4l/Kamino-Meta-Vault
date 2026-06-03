@@ -1296,6 +1296,60 @@ describe("kamino-meta-vault", () => {
     );
   });
 
+  it("freezes vote retraction after the voting deadline", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 10, voting: 12 });
+    const proposal = await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await ageBond(ctx.position);
+    await vote(ctx.config, ctx.position, proposal, payer);
+    await warpPast(ctx.votingDeadline);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .retractVote()
+          .accountsStrict({
+            owner: payer.publicKey,
+            config: ctx.config,
+            position: ctx.position,
+            proposal,
+          })
+          .rpc(),
+      "VotingClosed"
+    );
+
+    await program.methods
+      .finalize()
+      .accountsStrict({
+        config: ctx.config,
+        winningProposal: proposal,
+      })
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+
+    expect(configState.finalized).to.equal(true);
+    expect(configState.totalVotedPrincipal.toNumber()).to.equal(250_000);
+    expect(positionState.votedProposal.toBase58()).to.equal(
+      proposal.toBase58()
+    );
+    expect(proposalState.supportPrincipal.toNumber()).to.equal(250_000);
+  });
+
   it("rejects recording a Kamino vault before finalization", async () => {
     const ctx = await setupConfig();
     const kaminoVault = await createKaminoVaultAccount();

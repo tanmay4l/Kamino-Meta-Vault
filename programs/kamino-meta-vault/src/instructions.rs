@@ -678,6 +678,7 @@ pub struct RetractVote<'info> {
 }
 
 pub fn retract_vote(ctx: Context<RetractVote>) -> Result<()> {
+    let clock = Clock::get()?;
     let config = &mut ctx.accounts.config;
     let config_key = config.key();
     let proposal_key = ctx.accounts.proposal.key();
@@ -685,6 +686,10 @@ pub fn retract_vote(ctx: Context<RetractVote>) -> Result<()> {
     let weight = ctx.accounts.position.vote_weight;
     require!(!config.paused, MetaVaultError::Paused);
     require!(!config.finalized, MetaVaultError::AlreadyFinalized);
+    require!(
+        clock.slot <= config.voting_deadline_slot,
+        MetaVaultError::VotingClosed
+    );
     require!(
         ctx.accounts.position.voted_proposal != Pubkey::default(),
         MetaVaultError::NoActiveVote
