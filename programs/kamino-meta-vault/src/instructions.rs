@@ -317,7 +317,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     token::transfer(
         CpiContext::new(
-            token::ID,
+            ctx.accounts.token_program.key(),
             Transfer {
                 from: ctx.accounts.owner_token_account.to_account_info(),
                 to: ctx.accounts.bond_vault.to_account_info(),
@@ -421,7 +421,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
     ];
     token::transfer(
         CpiContext::new_with_signer(
-            token::ID,
+            ctx.accounts.token_program.key(),
             Transfer {
                 from: ctx.accounts.bond_vault.to_account_info(),
                 to: ctx.accounts.owner_token_account.to_account_info(),
