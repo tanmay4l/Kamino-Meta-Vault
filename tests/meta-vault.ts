@@ -607,7 +607,7 @@ describe("kamino-meta-vault", () => {
       "Unauthorized"
     );
 
-    for (const title of ["", " \t\n"]) {
+    for (const title of ["", " \t\n", "\u00a0\u2003"]) {
       await expectRpcError(
         () =>
           program.methods
