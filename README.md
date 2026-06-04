@@ -46,6 +46,6 @@ Not production complete:
 
 - No independent audit has been completed.
 - The program records a selected Kamino vault; it does not create or manage Kamino vaults by CPI.
-- The current Anchor/Solana SBF build emits an undefined-syscall post-processing warning. The program still builds and the validator test suite passes, but the warning should be cleared or accepted by reviewers before mainnet.
+- The current Anchor/Solana SBF build emits an undefined-syscall post-processing warning because the installed platform-tools syscall allowlist is empty. CI checks the compiled ELF and fails if it imports any undefined symbol outside the Solana runtime syscall set.
 - Devnet upgrades should be executed through the configured upgrade authority flow before claiming a new binary is deployed.
 - Mainnet launch needs a fresh audit, reproducible build hash, upgrade authority policy, monitoring, and incident runbook.
