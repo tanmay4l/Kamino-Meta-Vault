@@ -1100,6 +1100,17 @@ describe("kamino-meta-vault", () => {
           .rpc(),
       "InvalidConfig"
     );
+    await expectRpcError(
+      () =>
+        program.methods
+          .transferAuthority(payer.publicKey)
+          .accountsStrict({
+            authority: payer.publicKey,
+            config: ctx.config,
+          })
+          .rpc(),
+      "InvalidConfig"
+    );
 
     await program.methods
       .transferAuthority(newAuthority.publicKey)
@@ -1199,6 +1210,18 @@ describe("kamino-meta-vault", () => {
           })
           .rpc(),
       "Signature verification failed"
+    );
+    await expectRpcError(
+      () =>
+        program.methods
+          .transferAuthorityConfirmed()
+          .accountsStrict({
+            authority: payer.publicKey,
+            newAuthority: payer.publicKey,
+            config: ctx.config,
+          })
+          .rpc(),
+      "InvalidConfig"
     );
 
     await program.methods

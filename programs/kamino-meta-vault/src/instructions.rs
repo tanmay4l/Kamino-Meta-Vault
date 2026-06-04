@@ -245,6 +245,10 @@ fn transfer_authority_to(
 ) -> Result<()> {
     let config_key = config.key();
     let previous_authority = config.authority;
+    require!(
+        new_authority != previous_authority,
+        MetaVaultError::InvalidConfig
+    );
     config.authority = new_authority;
     emit!(AuthorityTransferred {
         config: config_key,
