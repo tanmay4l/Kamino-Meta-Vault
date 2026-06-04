@@ -713,7 +713,6 @@ pub fn retract_vote(ctx: Context<RetractVote>) -> Result<()> {
     let proposal_key = ctx.accounts.proposal.key();
     let principal = ctx.accounts.position.bonded_amount;
     let weight = ctx.accounts.position.vote_weight;
-    require!(!config.paused, MetaVaultError::Paused);
     require!(!config.finalized, MetaVaultError::AlreadyFinalized);
     require!(
         clock.slot <= config.voting_deadline_slot,

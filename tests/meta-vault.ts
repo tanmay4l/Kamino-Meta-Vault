@@ -1092,6 +1092,92 @@ describe("kamino-meta-vault", () => {
     expect(emptyVaultState.amount).to.equal(0n);
   });
 
+  it("permits active voters to retract and withdraw while paused", async () => {
+    const ctx = await setupConfig();
+    const proposal = await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await ageBond(ctx.position);
+    await vote(ctx.config, ctx.position, proposal, payer);
+
+    await program.methods
+      .setPaused(true)
+      .accountsStrict({
+        authority: payer.publicKey,
+        config: ctx.config,
+      })
+      .rpc();
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .withdraw(new anchor.BN(250_000))
+          .accountsStrict({
+            owner: payer.publicKey,
+            config: ctx.config,
+            position: ctx.position,
+            ownerTokenAccount: ctx.ownerAta,
+            bondVault: ctx.bondVault,
+            daoAuthority: ctx.daoAuthority,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .rpc(),
+      "ActiveVote"
+    );
+
+    await program.methods
+      .retractVote()
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        proposal,
+      })
+      .rpc();
+
+    await program.methods
+      .withdraw(new anchor.BN(250_000))
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        ownerTokenAccount: ctx.ownerAta,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.paused).to.equal(true);
+    expect(configState.totalBonded.toNumber()).to.equal(0);
+    expect(configState.totalVotedPrincipal.toNumber()).to.equal(0);
+    expect(configState.totalVoteWeight.toNumber()).to.equal(0);
+    expect(positionState.bondedAmount.toNumber()).to.equal(0);
+    expect(
+      positionState.votedProposal.equals(anchor.web3.PublicKey.default)
+    ).to.equal(true);
+    expect(positionState.voteWeight.toNumber()).to.equal(0);
+    expect(proposalState.supportPrincipal.toNumber()).to.equal(0);
+    expect(proposalState.supportWeight.toNumber()).to.equal(0);
+    expect(vaultState.amount).to.equal(0n);
+  });
+
   it("rejects spoofed token accounts and PDA authorities", async () => {
     const ctx = await setupConfig();
     const wrongMint = await createMint(
