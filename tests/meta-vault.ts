@@ -641,14 +641,41 @@ describe("kamino-meta-vault", () => {
       "InvalidProposalMetadata"
     );
 
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(payer.publicKey, metadataHash, "A".repeat(65))
+          .accountsStrict({
+            proposer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc(),
+      "InvalidConfig"
+    );
+
     const configState = await program.account.metaVaultConfig.fetch(ctx.config);
     expect(configState.proposalCount.toNumber()).to.equal(0);
 
-    await createProposal(ctx.config, 0);
+    const maxLengthTitle = "A".repeat(64);
+    await program.methods
+      .createProposal(payer.publicKey, metadataHash, maxLengthTitle)
+      .accountsStrict({
+        proposer: payer.publicKey,
+        config: ctx.config,
+        proposal,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
     const validConfigState = await program.account.metaVaultConfig.fetch(
       ctx.config
     );
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
     expect(validConfigState.proposalCount.toNumber()).to.equal(1);
+    expect(proposalState.title).to.equal(maxLengthTitle);
   });
 
   it("accepts a bond, records a proposal vote, and blocks withdrawal while voted", async () => {
