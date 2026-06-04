@@ -13,8 +13,11 @@ describe("sbf syscall imports", () => {
       true
     );
 
-    const undefinedSymbols = readUndefinedGlobalSymbols(programBinary);
-    const unexpectedSymbols = undefinedSymbols.filter(
+    const importedSymbols = readUndefinedGlobalSymbols(programBinary);
+    expect(importedSymbols.globalUndefinedLineCount).to.be.greaterThan(0);
+    expect(importedSymbols.symbols.length).to.be.greaterThan(0);
+
+    const unexpectedSymbols = importedSymbols.symbols.filter(
       (symbol) => !allowedRuntimeSyscalls.has(symbol)
     );
 
@@ -45,15 +48,23 @@ function readUndefinedGlobalSymbols(programBinary: string) {
     encoding: "utf8",
   });
   const symbols = new Set<string>();
+  let globalUndefinedLineCount = 0;
 
   for (const line of output.split("\n")) {
+    if (/\bGLOBAL\s+DEFAULT\s+UND\b/.test(line)) {
+      globalUndefinedLineCount += 1;
+    }
+
     const match = line.match(/\bGLOBAL\s+DEFAULT\s+UND\s+(\S+)\s*$/);
     if (match) {
       symbols.add(match[1]);
     }
   }
 
-  return [...symbols].sort();
+  return {
+    globalUndefinedLineCount,
+    symbols: [...symbols].sort(),
+  };
 }
 
 function resolveLlvmReadelf() {
