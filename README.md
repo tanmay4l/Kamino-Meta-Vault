@@ -36,6 +36,7 @@ Current backend bar:
 - Voting tallies freeze at the voting deadline; votes cannot be cast or retracted after the window closes.
 - Emergency pause blocks new campaign actions without blocking bonded-user withdrawals or empty-position closeout.
 - Active voters can retract during pause before withdrawing, so pause does not trap voted bond capital.
+- Finalize/fail closeout can still run while paused after the voting deadline, so post-deadline bond exits are not trapped.
 - Proposal creation is authority-gated, proposal count is bounded, and unvoted proposals can be canceled by the current config authority.
 - Strategy proposals require a non-empty title and nonzero metadata hash.
 - Proposal creation closes with the deposit window so locked bond capital cannot be redirected to late-added proposals.

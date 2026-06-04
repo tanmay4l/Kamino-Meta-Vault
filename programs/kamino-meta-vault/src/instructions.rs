@@ -768,7 +768,6 @@ pub struct Finalize<'info> {
 pub fn finalize(ctx: Context<Finalize>) -> Result<()> {
     let clock = Clock::get()?;
     let config = &mut ctx.accounts.config;
-    require!(!config.paused, MetaVaultError::Paused);
     require!(!config.finalized, MetaVaultError::AlreadyFinalized);
     require!(
         clock.slot > config.voting_deadline_slot,
@@ -824,7 +823,6 @@ pub fn fail_campaign(ctx: Context<FailCampaign>) -> Result<()> {
     let clock = Clock::get()?;
     let config = &mut ctx.accounts.config;
     let config_key = config.key();
-    require!(!config.paused, MetaVaultError::Paused);
     require!(!config.finalized, MetaVaultError::AlreadyFinalized);
     require!(
         clock.slot > config.voting_deadline_slot,

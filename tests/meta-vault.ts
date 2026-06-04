@@ -1723,6 +1723,84 @@ describe("kamino-meta-vault", () => {
     expect(proposalState.supportPrincipal.toNumber()).to.equal(250_000);
   });
 
+  it("permits paused campaign finalization after the voting deadline", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 10, voting: 12 });
+    const proposal = await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await ageBond(ctx.position);
+    await vote(ctx.config, ctx.position, proposal, payer);
+    await warpPast(ctx.votingDeadline);
+
+    await program.methods
+      .setPaused(true)
+      .accountsStrict({
+        authority: payer.publicKey,
+        config: ctx.config,
+      })
+      .rpc();
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .retractVote()
+          .accountsStrict({
+            owner: payer.publicKey,
+            config: ctx.config,
+            position: ctx.position,
+            proposal,
+          })
+          .rpc(),
+      "VotingClosed"
+    );
+
+    await program.methods
+      .finalize()
+      .accountsStrict({
+        config: ctx.config,
+        winningProposal: proposal,
+      })
+      .rpc();
+
+    await program.methods
+      .withdraw(new anchor.BN(250_000))
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        ownerTokenAccount: ctx.ownerAta,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.paused).to.equal(true);
+    expect(configState.finalized).to.equal(true);
+    expect(configState.selectedProposal.toBase58()).to.equal(
+      proposal.toBase58()
+    );
+    expect(configState.totalBonded.toNumber()).to.equal(0);
+    expect(positionState.bondedAmount.toNumber()).to.equal(0);
+    expect(
+      positionState.votedProposal.equals(anchor.web3.PublicKey.default)
+    ).to.equal(true);
+    expect(vaultState.amount).to.equal(0n);
+  });
+
   it("rejects recording a Kamino vault before finalization", async () => {
     const ctx = await setupConfig();
     const kaminoVault = await createKaminoVaultAccount();
@@ -1871,6 +1949,64 @@ describe("kamino-meta-vault", () => {
           .rpc(),
       "AlreadyFinalized"
     );
+  });
+
+  it("permits paused no-quorum campaign failure after the voting deadline", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 10, voting: 12 });
+    await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await warpPast(ctx.votingDeadline);
+
+    await program.methods
+      .setPaused(true)
+      .accountsStrict({
+        authority: payer.publicKey,
+        config: ctx.config,
+      })
+      .rpc();
+
+    await program.methods
+      .failCampaign()
+      .accountsStrict({
+        config: ctx.config,
+      })
+      .rpc();
+
+    await program.methods
+      .withdraw(new anchor.BN(250_000))
+      .accountsStrict({
+        owner: payer.publicKey,
+        config: ctx.config,
+        position: ctx.position,
+        ownerTokenAccount: ctx.ownerAta,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.paused).to.equal(true);
+    expect(configState.finalized).to.equal(true);
+    expect(
+      configState.selectedProposal.equals(anchor.web3.PublicKey.default)
+    ).to.equal(true);
+    expect(configState.totalBonded.toNumber()).to.equal(0);
+    expect(positionState.bondedAmount.toNumber()).to.equal(0);
+    expect(vaultState.amount).to.equal(0n);
   });
 
   it("rejects failing a campaign once strict quorum is reachable", async () => {
