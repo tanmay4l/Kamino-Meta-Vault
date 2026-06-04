@@ -60,4 +60,6 @@ pub enum MetaVaultError {
     Unauthorized,
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
+    #[msg("Deposit is below the configured minimum")]
+    DepositBelowMinimum,
 }

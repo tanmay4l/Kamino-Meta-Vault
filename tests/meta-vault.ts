@@ -742,6 +742,45 @@ describe("kamino-meta-vault", () => {
     expect(proposalState.supportPrincipal.toNumber()).to.equal(0);
   });
 
+  it("rejects zero and below-minimum deposits without moving funds", async () => {
+    const ctx = await setupConfig();
+
+    await expectRpcError(
+      () =>
+        deposit(
+          ctx.config,
+          ctx.position,
+          payer,
+          ctx.ownerAta,
+          ctx.bondVault,
+          0
+        ),
+      "ZeroAmount"
+    );
+    await expectRpcError(
+      () =>
+        deposit(
+          ctx.config,
+          ctx.position,
+          payer,
+          ctx.ownerAta,
+          ctx.bondVault,
+          99_999
+        ),
+      "DepositBelowMinimum"
+    );
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetchNullable(
+      ctx.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.totalBonded.toNumber()).to.equal(0);
+    expect(positionState).to.equal(null);
+    expect(vaultState.amount).to.equal(0n);
+  });
+
   it("closes an empty position and rejects active or funded positions", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);

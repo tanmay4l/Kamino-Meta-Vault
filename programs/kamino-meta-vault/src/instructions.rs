@@ -300,9 +300,10 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         clock.slot <= config.deposit_deadline_slot,
         MetaVaultError::DepositsClosed
     );
+    require!(amount > 0, MetaVaultError::ZeroAmount);
     require!(
         amount >= config.min_deposit_amount,
-        MetaVaultError::ZeroAmount
+        MetaVaultError::DepositBelowMinimum
     );
     require!(
         ctx.accounts.position.voted_proposal == Pubkey::default(),
