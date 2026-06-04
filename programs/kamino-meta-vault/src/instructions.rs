@@ -519,6 +519,10 @@ pub fn create_proposal(
         MetaVaultError::VotingClosed
     );
     require!(
+        clock.slot <= config.deposit_deadline_slot,
+        MetaVaultError::ProposalCreationClosed
+    );
+    require!(
         config.proposal_count < MAX_PROPOSALS,
         MetaVaultError::ProposalLimitReached
     );

@@ -958,6 +958,32 @@ describe("kamino-meta-vault", () => {
     );
   });
 
+  it("rejects new proposals after deposits close", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 5, voting: 50 });
+    await warpPast(ctx.depositDeadline);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .createProposal(
+            payer.publicKey,
+            metadataHash,
+            "late curator strategy"
+          )
+          .accountsStrict({
+            proposer: payer.publicKey,
+            config: ctx.config,
+            proposal: proposalAddress(ctx.config, 0),
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc(),
+      "ProposalCreationClosed"
+    );
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    expect(configState.proposalCount.toNumber()).to.equal(0);
+  });
+
   it("enforces pause authority, blocks deposits, and permits withdrawals while paused", async () => {
     const ctx = await setupConfig();
     const nonAuthority = anchor.web3.Keypair.generate();

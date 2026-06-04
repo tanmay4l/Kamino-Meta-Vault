@@ -62,4 +62,6 @@ pub enum MetaVaultError {
     ArithmeticOverflow,
     #[msg("Deposit is below the configured minimum")]
     DepositBelowMinimum,
+    #[msg("Proposal creation is closed")]
+    ProposalCreationClosed,
 }

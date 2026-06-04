@@ -37,6 +37,7 @@ Current backend bar:
 - Emergency pause blocks new campaign actions without blocking bonded-user withdrawals or empty-position closeout.
 - Proposal creation is authority-gated, proposal count is bounded, and unvoted proposals can be canceled by the current config authority.
 - Strategy proposals require a non-empty title and nonzero metadata hash.
+- Proposal creation closes with the deposit window so locked bond capital cannot be redirected to late-added proposals.
 - Authority can be handed off through a co-signed transfer path for multisig acceptance.
 - Campaigns can finalize successfully or fail when quorum/majority rules are not met.
 - Recorded Kamino vault accounts must be owned by an allowed Kamino kvault program, carry the Kamino `VaultState` discriminator, match the campaign mint, and use the DAO PDA as vault admin.
