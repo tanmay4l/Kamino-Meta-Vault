@@ -557,7 +557,7 @@ pub fn create_proposal(
 }
 
 fn has_visible_title(title: &str) -> bool {
-    title.chars().any(|char| !char.is_whitespace())
+    title.chars().any(char::is_alphanumeric)
 }
 
 #[derive(Accounts)]
