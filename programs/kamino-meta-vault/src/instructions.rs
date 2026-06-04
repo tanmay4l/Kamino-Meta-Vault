@@ -318,6 +318,12 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         position.start_slot = clock.slot;
         position.voted_proposal = Pubkey::default();
         position.vote_weight = 0;
+    } else {
+        require!(position.config == config_key, MetaVaultError::InvalidConfig);
+        require!(
+            position.owner == ctx.accounts.owner.key(),
+            MetaVaultError::Unauthorized
+        );
     }
 
     token::transfer(

@@ -663,6 +663,14 @@ describe("kamino-meta-vault", () => {
       ctx.bondVault,
       250_000
     );
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      100_000
+    );
     await ageBond(ctx.position);
     await vote(ctx.config, ctx.position, proposal, payer);
 
@@ -672,10 +680,10 @@ describe("kamino-meta-vault", () => {
     );
     const vaultState = await getAccount(provider.connection, ctx.bondVault);
 
-    expect(configState.totalBonded.toNumber()).to.equal(250_000);
-    expect(configState.totalVotedPrincipal.toNumber()).to.equal(250_000);
-    expect(proposalState.supportPrincipal.toNumber()).to.equal(250_000);
-    expect(vaultState.amount).to.equal(250_000n);
+    expect(configState.totalBonded.toNumber()).to.equal(350_000);
+    expect(configState.totalVotedPrincipal.toNumber()).to.equal(350_000);
+    expect(proposalState.supportPrincipal.toNumber()).to.equal(350_000);
+    expect(vaultState.amount).to.equal(350_000n);
 
     await expectRpcError(
       () =>
