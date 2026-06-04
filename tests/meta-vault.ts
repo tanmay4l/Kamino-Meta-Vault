@@ -1579,6 +1579,30 @@ describe("kamino-meta-vault", () => {
     );
   });
 
+  it("rejects proposal cancellation after deposits close", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 5, voting: 50 });
+    const proposal = await createProposal(ctx.config, 0);
+    await warpPast(ctx.depositDeadline);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .cancelProposal()
+          .accountsStrict({
+            signer: payer.publicKey,
+            config: ctx.config,
+            proposal,
+          })
+          .rpc(),
+      "ProposalChangeClosed"
+    );
+
+    const proposalState = await program.account.strategyProposal.fetch(
+      proposal
+    );
+    expect(proposalState.active).to.equal(true);
+  });
+
   it("rejects canceling a proposal after votes exist", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);

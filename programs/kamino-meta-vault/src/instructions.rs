@@ -590,6 +590,10 @@ pub fn cancel_proposal(ctx: Context<CancelProposal>) -> Result<()> {
         MetaVaultError::VotingClosed
     );
     require!(
+        clock.slot <= config.deposit_deadline_slot,
+        MetaVaultError::ProposalChangeClosed
+    );
+    require!(
         ctx.accounts.proposal.active,
         MetaVaultError::InactiveProposal
     );

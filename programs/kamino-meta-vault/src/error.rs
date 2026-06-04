@@ -64,4 +64,6 @@ pub enum MetaVaultError {
     DepositBelowMinimum,
     #[msg("Proposal creation is closed")]
     ProposalCreationClosed,
+    #[msg("Proposal changes are closed")]
+    ProposalChangeClosed,
 }
