@@ -66,4 +66,6 @@ pub enum MetaVaultError {
     ProposalCreationClosed,
     #[msg("Proposal changes are closed")]
     ProposalChangeClosed,
+    #[msg("Campaign must be finalized or failed before withdrawal")]
+    CampaignCloseoutRequired,
 }

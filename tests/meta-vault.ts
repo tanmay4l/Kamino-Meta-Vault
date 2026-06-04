@@ -1693,6 +1693,94 @@ describe("kamino-meta-vault", () => {
     );
   });
 
+  it("blocks pre-closeout withdrawals after the voting deadline", async () => {
+    const ctx = await setupConfig(5_000, { deposit: 10, voting: 12 });
+    const second = await setupSecondVoter(ctx.mint, ctx.config);
+    const proposal = await createProposal(ctx.config, 0);
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+    await deposit(
+      ctx.config,
+      second.position,
+      second.keypair,
+      second.ata,
+      ctx.bondVault,
+      750_000
+    );
+    await ageBond(ctx.position);
+    await vote(ctx.config, ctx.position, proposal, payer);
+    await warpPast(ctx.votingDeadline);
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .withdraw(new anchor.BN(750_000))
+          .accountsStrict({
+            owner: second.keypair.publicKey,
+            config: ctx.config,
+            position: second.position,
+            ownerTokenAccount: second.ata,
+            bondVault: ctx.bondVault,
+            daoAuthority: ctx.daoAuthority,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([second.keypair])
+          .rpc(),
+      "CampaignCloseoutRequired"
+    );
+
+    await expectRpcError(
+      () =>
+        program.methods
+          .finalize()
+          .accountsStrict({
+            config: ctx.config,
+            winningProposal: proposal,
+          })
+          .rpc(),
+      "QuorumNotReached"
+    );
+
+    await program.methods
+      .failCampaign()
+      .accountsStrict({
+        config: ctx.config,
+      })
+      .rpc();
+
+    await program.methods
+      .withdraw(new anchor.BN(750_000))
+      .accountsStrict({
+        owner: second.keypair.publicKey,
+        config: ctx.config,
+        position: second.position,
+        ownerTokenAccount: second.ata,
+        bondVault: ctx.bondVault,
+        daoAuthority: ctx.daoAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([second.keypair])
+      .rpc();
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const secondPositionState = await program.account.voterPosition.fetch(
+      second.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.finalized).to.equal(true);
+    expect(configState.totalBonded.toNumber()).to.equal(250_000);
+    expect(secondPositionState.bondedAmount.toNumber()).to.equal(0);
+    expect(vaultState.amount).to.equal(250_000n);
+  });
+
   it("freezes vote retraction after the voting deadline", async () => {
     const ctx = await setupConfig(5_000, { deposit: 10, voting: 12 });
     const proposal = await createProposal(ctx.config, 0);

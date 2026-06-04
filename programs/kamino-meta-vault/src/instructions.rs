@@ -397,14 +397,21 @@ pub struct Withdraw<'info> {
 }
 
 pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+    let clock = Clock::get()?;
     let config_key = ctx.accounts.config.key();
     let position_key = ctx.accounts.position.key();
     let config = &mut ctx.accounts.config;
     require!(amount > 0, MetaVaultError::ZeroAmount);
-    require!(
-        config.finalized || ctx.accounts.position.voted_proposal == Pubkey::default(),
-        MetaVaultError::ActiveVote
-    );
+    if !config.finalized {
+        require!(
+            ctx.accounts.position.voted_proposal == Pubkey::default(),
+            MetaVaultError::ActiveVote
+        );
+        require!(
+            clock.slot <= config.voting_deadline_slot,
+            MetaVaultError::CampaignCloseoutRequired
+        );
+    }
     require!(
         ctx.accounts.position.bonded_amount >= amount,
         MetaVaultError::InsufficientBond

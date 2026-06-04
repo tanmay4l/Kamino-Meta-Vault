@@ -34,6 +34,7 @@ Current backend bar:
 - Campaign setup rejects zero minimum deposits and out-of-range quorum values.
 - Voting uses bonded deposits, time-weighted voting, strict quorum, and strict majority.
 - Voting tallies freeze at the voting deadline; votes cannot be cast or retracted after the window closes.
+- Pre-closeout withdrawals stop after the voting deadline, so quorum cannot be changed after votes are frozen.
 - Emergency pause blocks new campaign actions without blocking bonded-user withdrawals or empty-position closeout.
 - Active voters can retract during pause before withdrawing, so pause does not trap voted bond capital.
 - Finalize/fail closeout can still run while paused after the voting deadline, so post-deadline bond exits are not trapped.
