@@ -789,6 +789,51 @@ describe("kamino-meta-vault", () => {
     expect(vaultState.amount).to.equal(0n);
   });
 
+  it("rejects zero and over-balance withdrawals without moving funds", async () => {
+    const ctx = await setupConfig();
+
+    await deposit(
+      ctx.config,
+      ctx.position,
+      payer,
+      ctx.ownerAta,
+      ctx.bondVault,
+      250_000
+    );
+
+    for (const [amount, error] of [
+      [0, "ZeroAmount"],
+      [250_001, "InsufficientBond"],
+    ] as const) {
+      await expectRpcError(
+        () =>
+          program.methods
+            .withdraw(new anchor.BN(amount))
+            .accountsStrict({
+              owner: payer.publicKey,
+              config: ctx.config,
+              position: ctx.position,
+              ownerTokenAccount: ctx.ownerAta,
+              bondVault: ctx.bondVault,
+              daoAuthority: ctx.daoAuthority,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .rpc(),
+        error
+      );
+    }
+
+    const configState = await program.account.metaVaultConfig.fetch(ctx.config);
+    const positionState = await program.account.voterPosition.fetch(
+      ctx.position
+    );
+    const vaultState = await getAccount(provider.connection, ctx.bondVault);
+
+    expect(configState.totalBonded.toNumber()).to.equal(250_000);
+    expect(positionState.bondedAmount.toNumber()).to.equal(250_000);
+    expect(vaultState.amount).to.equal(250_000n);
+  });
+
   it("closes an empty position and rejects active or funded positions", async () => {
     const ctx = await setupConfig();
     const proposal = await createProposal(ctx.config, 0);
