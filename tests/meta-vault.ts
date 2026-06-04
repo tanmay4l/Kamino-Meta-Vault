@@ -1659,6 +1659,8 @@ describe("kamino-meta-vault", () => {
     const second = await setupSecondVoter(ctx.mint, ctx.config);
     const firstProposal = await createProposal(ctx.config, 0);
     const secondProposal = await createProposal(ctx.config, 1);
+    const otherCtx = await setupConfig();
+    const otherProposal = await createProposal(otherCtx.config, 0);
 
     await deposit(
       ctx.config,
@@ -1698,6 +1700,50 @@ describe("kamino-meta-vault", () => {
           ])
           .rpc(),
       "ProposalCountMismatch"
+    );
+    await expectRpcError(
+      () =>
+        program.methods
+          .failCampaign()
+          .accountsStrict({
+            config: ctx.config,
+          })
+          .remainingAccounts([
+            {
+              pubkey: firstProposal,
+              isWritable: false,
+              isSigner: false,
+            },
+            {
+              pubkey: firstProposal,
+              isWritable: false,
+              isSigner: false,
+            },
+          ])
+          .rpc(),
+      "DuplicateProposal"
+    );
+    await expectRpcError(
+      () =>
+        program.methods
+          .failCampaign()
+          .accountsStrict({
+            config: ctx.config,
+          })
+          .remainingAccounts([
+            {
+              pubkey: firstProposal,
+              isWritable: false,
+              isSigner: false,
+            },
+            {
+              pubkey: otherProposal,
+              isWritable: false,
+              isSigner: false,
+            },
+          ])
+          .rpc(),
+      "ProposalConfigMismatch"
     );
 
     await program.methods
