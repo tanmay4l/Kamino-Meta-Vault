@@ -274,7 +274,12 @@ pub struct Deposit<'info> {
         constraint = owner_token_account.owner == owner.key() @ MetaVaultError::Unauthorized
     )]
     pub owner_token_account: Account<'info, TokenAccount>,
-    #[account(mut, address = config.bond_vault)]
+    #[account(
+        mut,
+        address = config.bond_vault,
+        constraint = bond_vault.mint == config.token_mint,
+        constraint = bond_vault.owner == config.dao_authority @ MetaVaultError::Unauthorized
+    )]
     pub bond_vault: Account<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -363,9 +368,18 @@ pub struct Withdraw<'info> {
         constraint = owner_token_account.owner == owner.key() @ MetaVaultError::Unauthorized
     )]
     pub owner_token_account: Account<'info, TokenAccount>,
-    #[account(mut, address = config.bond_vault)]
+    #[account(
+        mut,
+        address = config.bond_vault,
+        constraint = bond_vault.mint == config.token_mint,
+        constraint = bond_vault.owner == config.dao_authority @ MetaVaultError::Unauthorized
+    )]
     pub bond_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [AUTHORITY_SEED, config.key().as_ref()], bump = config.authority_bump)]
+    #[account(
+        seeds = [AUTHORITY_SEED, config.key().as_ref()],
+        bump = config.authority_bump,
+        address = config.dao_authority
+    )]
     /// CHECK: PDA token authority for the bond vault.
     pub dao_authority: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,

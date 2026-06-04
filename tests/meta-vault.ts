@@ -994,7 +994,7 @@ describe("kamino-meta-vault", () => {
           wrongMintAta.address,
           250_000
         ),
-      "ConstraintAddress"
+      "ConstraintRaw"
     );
 
     const otherOwner = anchor.web3.Keypair.generate();
